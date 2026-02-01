@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>6桁番号リアルタイム判定</title>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<style>
+  body {
+    margin: 0;
+    background: black;
+    font-family: sans-serif;
+  }
+
+  #container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    border: 12px solid red;
+    box-sizing: border-box;
+  }
+
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  #result {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 12px 20px;
+    font-size: 28px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    border-radius: 8px;
+  }
+
+  /* 読み取りガイド枠（視覚補助） */
+  #guide {
+    position: absolute;
+    top: 30%;
+    left: 15%;
+    width: 70%;
+    height: 20%;
+    border: 2px dashed yellow;
+    box-sizing: border-box;
+  }
+</style>
+</head>
+
+<body>
+<div id="container">
+  <video id="video" autoplay playsinline></video>
+  <div id="guide"></div>
+  <div id="result">判定中…</div>
+</div>
+
+<script>
+const video = document.getElementById("video");
+const container = document.getElementById("container");
+const result = document.getElementById("result");
+
+// ===== 外カメラ起動 =====
+navigator.mediaDevices.getUserMedia({
+  video: { facingMode: "environment" }
+})
+.then(stream => video.srcObject = stream)
+.catch(() => {
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => video.srcObject = stream);
+});
+
+// ===== 0.5秒ごとに判定 =====
+setInterval(async () => {
+  if (video.videoWidth === 0) return;
+
+  // 中央部分だけ切り出す
+  const canvas = document.createElement("canvas");
+  const w = video.videoWidth * 0.7;
+  const h = video.videoHeight * 0.2;
+  const x = video.videoWidth * 0.15;
+  const y = video.videoHeight * 0.3;
+
+  canvas.width = w;
+  canvas.height = h;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, x, y, w, h, 0, 0, w, h);
+
+  // ===== 白黒＋二値化 =====
+  const img = ctx.getImageData(0, 0, w, h);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const r = img.data[i];
+    const g = img.data[i + 1];
+    const b = img.data[i + 2];
+    const gray = (r + g + b) / 3;
+    const v = gray > 140 ? 255 : 0; // しきい値
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const { data } = await Tesseract.recognize(canvas, "eng", {
+    tessedit_char_whitelist: "0123456789",
+    classify_bln_numeric_mode: 1
+  });
+
+  const match = data.text.replace(/\D/g, "").match(/\d{6}/);
+
+  container.style.borderColor = "red";
+  result.textContent = "判定中…";
+
+  if (!match) return;
+
+  judge(match[0]);
+
+}, 500);
+
+// ===== 判定ロジック =====
+function judge(num) {
+  if (num === "455756") {
+    win("一等", num);
+  } else if (num.slice(-4) === "5037") {
+    win("二等", num);
+  } else if (["73", "44", "84"].includes(num.slice(-2))) {
+    win("三等", num);
+  } else {
+    result.textContent = `はずれ（${num}）`;
+  }
+}
+
+function win(rank, num) {
+  container.style.borderColor = "lime";
+  result.textContent = `${rank}（${num}）`;
+}
+</script>
+</body>
+</html>
