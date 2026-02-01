@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Camera Frame Detection</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+  body {
+    margin: 0;
+    background: black;
+    overflow: hidden;
+  }
+
+  video, canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  canvas {
+    pointer-events: none;
+  }
+</style>
+</head>
+
+<body>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: { ideal: "environment" } // 外カメラ優先
+    }
+  });
+  video.srcObject = stream;
+}
+
+video.addEventListener("loadedmetadata", () => {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  drawLoop();
+});
+
+function drawLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // ---- 判定条件（仮）----
+  const conditionOK = Math.random() > 0.7; // 今はランダム
+
+  ctx.strokeStyle = conditionOK ? "lime" : "red";
+  ctx.lineWidth = 6;
+  ctx.setLineDash([20, 10]); // ← 点線
+
+  ctx.strokeRect(
+    canvas.width * 0.2,
+    canvas.height * 0.2,
+    canvas.width * 0.6,
+    canvas.height * 0.6
+  );
+
+  requestAnimationFrame(drawLoop);
+}
+
+startCamera();
+</script>
+
+</body>
+</html>
